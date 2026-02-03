@@ -1,0 +1,755 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>outlines: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">digital.vasic.optimization/pkg/outlines/constrainer.go (97.4%)</option>
+				
+				<option value="file1">digital.vasic.optimization/pkg/outlines/schema.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package outlines
+
+import (
+        "encoding/json"
+        "fmt"
+        "reflect"
+        "regexp"
+        "strings"
+)
+
+// Constrainer defines the interface for constraining LLM output.
+type Constrainer interface {
+        // Constrain validates and optionally fixes output against a schema.
+        // Returns the constrained output and any error.
+        Constrain(output string, schema *Schema) (string, error)
+}
+
+// ValidationError represents a validation error.
+type ValidationError struct {
+        Path    string `json:"path"`
+        Message string `json:"message"`
+}
+
+// Error implements the error interface.
+func (e *ValidationError) Error() string <span class="cov8" title="1">{
+        if e.Path != "" </span><span class="cov8" title="1">{
+                return fmt.Sprintf("%s: %s", e.Path, e.Message)
+        }</span>
+        <span class="cov8" title="1">return e.Message</span>
+}
+
+// ValidationResult contains the result of schema validation.
+type ValidationResult struct {
+        Valid  bool               `json:"valid"`
+        Errors []*ValidationError `json:"errors,omitempty"`
+        Data   interface{}        `json:"data,omitempty"`
+}
+
+// AddError adds a validation error.
+func (r *ValidationResult) AddError(path, message string) <span class="cov8" title="1">{
+        r.Valid = false
+        r.Errors = append(r.Errors, &amp;ValidationError{
+                Path:    path,
+                Message: message,
+        })
+}</span>
+
+// ErrorMessages returns all error messages as strings.
+func (r *ValidationResult) ErrorMessages() []string <span class="cov8" title="1">{
+        messages := make([]string, len(r.Errors))
+        for i, err := range r.Errors </span><span class="cov8" title="1">{
+                messages[i] = err.Error()
+        }</span>
+        <span class="cov8" title="1">return messages</span>
+}
+
+// JSONConstrainer validates and fixes JSON output against a schema.
+type JSONConstrainer struct{}
+
+// NewJSONConstrainer creates a new JSON constrainer.
+func NewJSONConstrainer() *JSONConstrainer <span class="cov8" title="1">{
+        return &amp;JSONConstrainer{}
+}</span>
+
+// Constrain validates JSON output against the schema.
+func (c *JSONConstrainer) Constrain(
+        output string,
+        schema *Schema,
+) (string, error) <span class="cov8" title="1">{
+        // Try to extract JSON from the output.
+        jsonStr := extractJSON(output)
+        if jsonStr == "" </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("no valid JSON found in output")
+        }</span>
+
+        // Parse and validate.
+        <span class="cov8" title="1">result := Validate(jsonStr, schema)
+        if !result.Valid </span><span class="cov8" title="1">{
+                return jsonStr, fmt.Errorf(
+                        "validation failed: %s",
+                        strings.Join(result.ErrorMessages(), "; "),
+                )
+        }</span>
+
+        <span class="cov8" title="1">return jsonStr, nil</span>
+}
+
+// RegexConstrainer validates output against a regex pattern.
+type RegexConstrainer struct {
+        pattern *regexp.Regexp
+}
+
+// NewRegexConstrainer creates a new regex constrainer.
+func NewRegexConstrainer(pattern string) (*RegexConstrainer, error) <span class="cov8" title="1">{
+        re, err := regexp.Compile(pattern)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("invalid pattern %q: %w", pattern, err)
+        }</span>
+        <span class="cov8" title="1">return &amp;RegexConstrainer{pattern: re}, nil</span>
+}
+
+// Constrain validates output against the regex pattern.
+// The schema parameter is ignored for regex constraining.
+func (c *RegexConstrainer) Constrain(
+        output string,
+        _ *Schema,
+) (string, error) <span class="cov8" title="1">{
+        output = strings.TrimSpace(output)
+        if c.pattern.MatchString(output) </span><span class="cov8" title="1">{
+                return output, nil
+        }</span>
+
+        // Try to find a matching substring.
+        <span class="cov8" title="1">match := c.pattern.FindString(output)
+        if match != "" </span><span class="cov0" title="0">{
+                return match, nil
+        }</span>
+
+        <span class="cov8" title="1">return output, fmt.Errorf(
+                "output does not match pattern %q", c.pattern.String(),
+        )</span>
+}
+
+// Validate validates a JSON string against a schema.
+func Validate(jsonStr string, schema *Schema) *ValidationResult <span class="cov8" title="1">{
+        result := &amp;ValidationResult{Valid: true}
+
+        var data interface{}
+        if err := json.Unmarshal([]byte(jsonStr), &amp;data); err != nil </span><span class="cov8" title="1">{
+                result.AddError("", fmt.Sprintf("invalid JSON: %v", err))
+                return result
+        }</span>
+
+        <span class="cov8" title="1">validateValue(data, schema, "", result)
+        result.Data = data
+        return result</span>
+}
+
+func validateValue(
+        data interface{},
+        schema *Schema,
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        if schema == nil </span><span class="cov8" title="1">{
+                return
+        }</span>
+
+        <span class="cov8" title="1">if len(schema.Enum) &gt; 0 </span><span class="cov8" title="1">{
+                validateEnum(data, schema.Enum, path, result)
+                return
+        }</span>
+
+        <span class="cov8" title="1">switch schema.Type </span>{
+        case "object":<span class="cov8" title="1">
+                validateObject(data, schema, path, result)</span>
+        case "array":<span class="cov8" title="1">
+                validateArray(data, schema, path, result)</span>
+        case "string":<span class="cov8" title="1">
+                validateString(data, schema, path, result)</span>
+        case "number":<span class="cov8" title="1">
+                validateNumber(data, schema, path, result)</span>
+        case "integer":<span class="cov8" title="1">
+                validateInteger(data, schema, path, result)</span>
+        case "boolean":<span class="cov8" title="1">
+                validateBoolean(data, path, result)</span>
+        case "":<span class="cov8" title="1"></span>
+                // No type specified, any type is valid.
+        }
+}
+
+func validateObject(
+        data interface{},
+        schema *Schema,
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        obj, ok := data.(map[string]interface{})
+        if !ok </span><span class="cov8" title="1">{
+                result.AddError(path, "expected object")
+                return
+        }</span>
+
+        <span class="cov8" title="1">for _, req := range schema.Required </span><span class="cov8" title="1">{
+                if _, exists := obj[req]; !exists </span><span class="cov8" title="1">{
+                        result.AddError(
+                                joinPath(path, req),
+                                "required property missing",
+                        )
+                }</span>
+        }
+
+        <span class="cov8" title="1">for propName, propSchema := range schema.Properties </span><span class="cov8" title="1">{
+                if propValue, exists := obj[propName]; exists </span><span class="cov8" title="1">{
+                        validateValue(
+                                propValue,
+                                propSchema,
+                                joinPath(path, propName),
+                                result,
+                        )
+                }</span>
+        }
+
+        <span class="cov8" title="1">if schema.AdditionalProperties != nil &amp;&amp; !*schema.AdditionalProperties </span><span class="cov8" title="1">{
+                for propName := range obj </span><span class="cov8" title="1">{
+                        if _, defined := schema.Properties[propName]; !defined </span><span class="cov8" title="1">{
+                                result.AddError(
+                                        joinPath(path, propName),
+                                        "additional property not allowed",
+                                )
+                        }</span>
+                }
+        }
+}
+
+func validateArray(
+        data interface{},
+        schema *Schema,
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        arr, ok := data.([]interface{})
+        if !ok </span><span class="cov8" title="1">{
+                result.AddError(path, "expected array")
+                return
+        }</span>
+
+        <span class="cov8" title="1">if schema.MinItems != nil &amp;&amp; len(arr) &lt; *schema.MinItems </span><span class="cov8" title="1">{
+                result.AddError(path, fmt.Sprintf(
+                        "array must have at least %d items", *schema.MinItems,
+                ))
+        }</span>
+        <span class="cov8" title="1">if schema.MaxItems != nil &amp;&amp; len(arr) &gt; *schema.MaxItems </span><span class="cov8" title="1">{
+                result.AddError(path, fmt.Sprintf(
+                        "array must have at most %d items", *schema.MaxItems,
+                ))
+        }</span>
+
+        <span class="cov8" title="1">if schema.Items != nil </span><span class="cov8" title="1">{
+                for i, item := range arr </span><span class="cov8" title="1">{
+                        validateValue(
+                                item,
+                                schema.Items,
+                                fmt.Sprintf("%s[%d]", path, i),
+                                result,
+                        )
+                }</span>
+        }
+}
+
+func validateString(
+        data interface{},
+        schema *Schema,
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        str, ok := data.(string)
+        if !ok </span><span class="cov8" title="1">{
+                result.AddError(path, "expected string")
+                return
+        }</span>
+
+        <span class="cov8" title="1">if schema.MinLength != nil &amp;&amp; len(str) &lt; *schema.MinLength </span><span class="cov8" title="1">{
+                result.AddError(path, fmt.Sprintf(
+                        "string must be at least %d characters", *schema.MinLength,
+                ))
+        }</span>
+        <span class="cov8" title="1">if schema.MaxLength != nil &amp;&amp; len(str) &gt; *schema.MaxLength </span><span class="cov8" title="1">{
+                result.AddError(path, fmt.Sprintf(
+                        "string must be at most %d characters", *schema.MaxLength,
+                ))
+        }</span>
+
+        <span class="cov8" title="1">if schema.Pattern != "" </span><span class="cov8" title="1">{
+                re, err := regexp.Compile(schema.Pattern)
+                if err == nil &amp;&amp; !re.MatchString(str) </span><span class="cov8" title="1">{
+                        result.AddError(path, fmt.Sprintf(
+                                "string must match pattern %q", schema.Pattern,
+                        ))
+                }</span>
+        }
+}
+
+func validateNumber(
+        data interface{},
+        schema *Schema,
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        var num float64
+        switch n := data.(type) </span>{
+        case float64:<span class="cov8" title="1">
+                num = n</span>
+        case int:<span class="cov0" title="0">
+                num = float64(n)</span>
+        default:<span class="cov8" title="1">
+                result.AddError(path, "expected number")
+                return</span>
+        }
+
+        <span class="cov8" title="1">validateNumericConstraints(num, schema, path, result)</span>
+}
+
+func validateInteger(
+        data interface{},
+        schema *Schema,
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        var num float64
+        switch n := data.(type) </span>{
+        case float64:<span class="cov8" title="1">
+                if n != float64(int64(n)) </span><span class="cov8" title="1">{
+                        result.AddError(path, "expected integer")
+                        return
+                }</span>
+                <span class="cov8" title="1">num = n</span>
+        case int:<span class="cov0" title="0">
+                num = float64(n)</span>
+        default:<span class="cov8" title="1">
+                result.AddError(path, "expected integer")
+                return</span>
+        }
+
+        <span class="cov8" title="1">validateNumericConstraints(num, schema, path, result)</span>
+}
+
+func validateNumericConstraints(
+        num float64,
+        schema *Schema,
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        if schema.Minimum != nil &amp;&amp; num &lt; *schema.Minimum </span><span class="cov8" title="1">{
+                result.AddError(path, fmt.Sprintf(
+                        "value must be &gt;= %v", *schema.Minimum,
+                ))
+        }</span>
+        <span class="cov8" title="1">if schema.Maximum != nil &amp;&amp; num &gt; *schema.Maximum </span><span class="cov8" title="1">{
+                result.AddError(path, fmt.Sprintf(
+                        "value must be &lt;= %v", *schema.Maximum,
+                ))
+        }</span>
+}
+
+func validateBoolean(
+        data interface{},
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        if _, ok := data.(bool); !ok </span><span class="cov8" title="1">{
+                result.AddError(path, "expected boolean")
+        }</span>
+}
+
+func validateEnum(
+        data interface{},
+        enum []interface{},
+        path string,
+        result *ValidationResult,
+) <span class="cov8" title="1">{
+        for _, allowed := range enum </span><span class="cov8" title="1">{
+                if reflect.DeepEqual(data, allowed) </span><span class="cov8" title="1">{
+                        return
+                }</span>
+        }
+        <span class="cov8" title="1">result.AddError(path, fmt.Sprintf(
+                "value must be one of %v", enum,
+        ))</span>
+}
+
+func joinPath(base, property string) string <span class="cov8" title="1">{
+        if base == "" </span><span class="cov8" title="1">{
+                return property
+        }</span>
+        <span class="cov8" title="1">return base + "." + property</span>
+}
+
+// extractJSON extracts JSON content from a response that may contain text.
+func extractJSON(response string) string <span class="cov8" title="1">{
+        response = strings.TrimSpace(response)
+
+        // Try to find JSON object.
+        if start := strings.Index(response, "{"); start != -1 </span><span class="cov8" title="1">{
+                if end := findMatchingBrace(
+                        response[start:], '{', '}',
+                ); end != -1 </span><span class="cov8" title="1">{
+                        return response[start : start+end+1]
+                }</span>
+        }
+
+        // Try to find JSON array.
+        <span class="cov8" title="1">if start := strings.Index(response, "["); start != -1 </span><span class="cov8" title="1">{
+                if end := findMatchingBrace(
+                        response[start:], '[', ']',
+                ); end != -1 </span><span class="cov8" title="1">{
+                        return response[start : start+end+1]
+                }</span>
+        }
+
+        // Check if entire response is valid JSON.
+        <span class="cov8" title="1">var js interface{}
+        if err := json.Unmarshal([]byte(response), &amp;js); err == nil </span><span class="cov8" title="1">{
+                return response
+        }</span>
+
+        <span class="cov8" title="1">return ""</span>
+}
+
+func findMatchingBrace(s string, open, close byte) int <span class="cov8" title="1">{
+        if len(s) == 0 || s[0] != open </span><span class="cov0" title="0">{
+                return -1
+        }</span>
+
+        <span class="cov8" title="1">count := 0
+        inString := false
+        escaped := false
+
+        for i := 0; i &lt; len(s); i++ </span><span class="cov8" title="1">{
+                c := s[i]
+
+                if escaped </span><span class="cov8" title="1">{
+                        escaped = false
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if c == '\\' &amp;&amp; inString </span><span class="cov8" title="1">{
+                        escaped = true
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if c == '"' </span><span class="cov8" title="1">{
+                        inString = !inString
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if inString </span><span class="cov8" title="1">{
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if c == open </span><span class="cov8" title="1">{
+                        count++
+                }</span> else<span class="cov8" title="1"> if c == close </span><span class="cov8" title="1">{
+                        count--
+                        if count == 0 </span><span class="cov8" title="1">{
+                                return i
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return -1</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package outlines provides structured output constraints for LLM responses
+// using JSON Schema validation and regex pattern matching.
+package outlines
+
+import (
+        "encoding/json"
+        "fmt"
+)
+
+// Schema defines an output structure using JSON Schema.
+type Schema struct {
+        Type                 string             `json:"type,omitempty"`
+        Properties           map[string]*Schema `json:"properties,omitempty"`
+        Required             []string           `json:"required,omitempty"`
+        Items                *Schema            `json:"items,omitempty"`
+        Enum                 []interface{}      `json:"enum,omitempty"`
+        MinLength            *int               `json:"minLength,omitempty"`
+        MaxLength            *int               `json:"maxLength,omitempty"`
+        Minimum              *float64           `json:"minimum,omitempty"`
+        Maximum              *float64           `json:"maximum,omitempty"`
+        Pattern              string             `json:"pattern,omitempty"`
+        MinItems             *int               `json:"minItems,omitempty"`
+        MaxItems             *int               `json:"maxItems,omitempty"`
+        UniqueItems          bool               `json:"uniqueItems,omitempty"`
+        AdditionalProperties *bool              `json:"additionalProperties,omitempty"`
+        Description          string             `json:"description,omitempty"`
+        Default              interface{}        `json:"default,omitempty"`
+        Format               string             `json:"format,omitempty"`
+        OneOf                []*Schema          `json:"oneOf,omitempty"`
+        AnyOf                []*Schema          `json:"anyOf,omitempty"`
+        AllOf                []*Schema          `json:"allOf,omitempty"`
+}
+
+// ParseSchema parses a JSON schema from bytes.
+func ParseSchema(data []byte) (*Schema, error) <span class="cov8" title="1">{
+        var schema Schema
+        if err := json.Unmarshal(data, &amp;schema); err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("failed to parse schema: %w", err)
+        }</span>
+        <span class="cov8" title="1">return &amp;schema, nil</span>
+}
+
+// String returns the JSON representation of the schema.
+func (s *Schema) String() string <span class="cov8" title="1">{
+        bytes, _ := json.MarshalIndent(s, "", "  ")
+        return string(bytes)
+}</span>
+
+// IsRequired checks if a property is required.
+func (s *Schema) IsRequired(property string) bool <span class="cov8" title="1">{
+        for _, req := range s.Required </span><span class="cov8" title="1">{
+                if req == property </span><span class="cov8" title="1">{
+                        return true
+                }</span>
+        }
+        <span class="cov8" title="1">return false</span>
+}
+
+// SchemaBuilder provides a fluent API for building schemas.
+type SchemaBuilder struct {
+        schema *Schema
+}
+
+// NewSchemaBuilder creates a new schema builder.
+func NewSchemaBuilder() *SchemaBuilder <span class="cov8" title="1">{
+        return &amp;SchemaBuilder{schema: &amp;Schema{}}
+}</span>
+
+// Object sets the type to object.
+func (b *SchemaBuilder) Object() *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Type = "object"
+        if b.schema.Properties == nil </span><span class="cov8" title="1">{
+                b.schema.Properties = make(map[string]*Schema)
+        }</span>
+        <span class="cov8" title="1">return b</span>
+}
+
+// Array sets the type to array.
+func (b *SchemaBuilder) Array() *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Type = "array"
+        return b
+}</span>
+
+// StringType sets the type to string.
+func (b *SchemaBuilder) StringType() *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Type = "string"
+        return b
+}</span>
+
+// NumberType sets the type to number.
+func (b *SchemaBuilder) NumberType() *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Type = "number"
+        return b
+}</span>
+
+// IntegerType sets the type to integer.
+func (b *SchemaBuilder) IntegerType() *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Type = "integer"
+        return b
+}</span>
+
+// BooleanType sets the type to boolean.
+func (b *SchemaBuilder) BooleanType() *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Type = "boolean"
+        return b
+}</span>
+
+// Property adds a property to an object schema.
+func (b *SchemaBuilder) Property(
+        name string,
+        schema *Schema,
+) *SchemaBuilder <span class="cov8" title="1">{
+        if b.schema.Properties == nil </span><span class="cov8" title="1">{
+                b.schema.Properties = make(map[string]*Schema)
+        }</span>
+        <span class="cov8" title="1">b.schema.Properties[name] = schema
+        return b</span>
+}
+
+// RequiredProps marks properties as required.
+func (b *SchemaBuilder) RequiredProps(
+        properties ...string,
+) *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Required = append(b.schema.Required, properties...)
+        return b
+}</span>
+
+// Items sets the items schema for an array.
+func (b *SchemaBuilder) Items(schema *Schema) *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Items = schema
+        return b
+}</span>
+
+// EnumValues sets allowed values.
+func (b *SchemaBuilder) EnumValues(
+        values ...interface{},
+) *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Enum = values
+        return b
+}</span>
+
+// SetPattern sets a regex pattern for strings.
+func (b *SchemaBuilder) SetPattern(pattern string) *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Pattern = pattern
+        return b
+}</span>
+
+// SetDescription sets the schema description.
+func (b *SchemaBuilder) SetDescription(desc string) *SchemaBuilder <span class="cov8" title="1">{
+        b.schema.Description = desc
+        return b
+}</span>
+
+// Build returns the constructed schema.
+func (b *SchemaBuilder) Build() *Schema <span class="cov8" title="1">{
+        return b.schema
+}</span>
+
+// Helper constructors for common schemas.
+
+// StringSchema creates a string schema.
+func StringSchema() *Schema <span class="cov8" title="1">{
+        return &amp;Schema{Type: "string"}
+}</span>
+
+// IntegerSchema creates an integer schema.
+func IntegerSchema() *Schema <span class="cov8" title="1">{
+        return &amp;Schema{Type: "integer"}
+}</span>
+
+// NumberSchema creates a number schema.
+func NumberSchema() *Schema <span class="cov8" title="1">{
+        return &amp;Schema{Type: "number"}
+}</span>
+
+// BooleanSchema creates a boolean schema.
+func BooleanSchema() *Schema <span class="cov8" title="1">{
+        return &amp;Schema{Type: "boolean"}
+}</span>
+
+// ArraySchema creates an array schema with the given item type.
+func ArraySchema(items *Schema) *Schema <span class="cov8" title="1">{
+        return &amp;Schema{Type: "array", Items: items}
+}</span>
+
+// ObjectSchema creates an object schema with properties.
+func ObjectSchema(
+        properties map[string]*Schema,
+        required ...string,
+) *Schema <span class="cov8" title="1">{
+        return &amp;Schema{
+                Type:       "object",
+                Properties: properties,
+                Required:   required,
+        }
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

@@ -83,10 +83,14 @@ func DefaultLangChainConfig() *LangChainConfig {
 	}
 }
 
+// jsonMarshaler is a function type for JSON marshaling (for testing).
+type jsonMarshaler func(v interface{}) ([]byte, error)
+
 // LangChainHTTPAdapter implements LangChainAdapter using HTTP.
 type LangChainHTTPAdapter struct {
-	config     *LangChainConfig
-	httpClient *http.Client
+	config       *LangChainConfig
+	httpClient   *http.Client
+	marshalJSON  jsonMarshaler
 }
 
 // NewLangChainHTTPAdapter creates a new LangChain HTTP adapter.
@@ -99,6 +103,7 @@ func NewLangChainHTTPAdapter(config *LangChainConfig) *LangChainHTTPAdapter {
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
+		marshalJSON: json.Marshal,
 	}
 }
 
@@ -182,7 +187,11 @@ func (a *LangChainHTTPAdapter) doRequest(
 ) (*http.Response, error) {
 	var bodyReader io.Reader
 	if body != nil {
-		data, err := json.Marshal(body)
+		marshal := a.marshalJSON
+		if marshal == nil {
+			marshal = json.Marshal
+		}
+		data, err := marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request: %w", err)
 		}

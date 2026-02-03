@@ -80,10 +80,14 @@ type completionResponse struct {
 	Choices []completionChoice `json:"choices"`
 }
 
+// jsonMarshaler is a function type for JSON marshaling (for testing).
+type jsonMarshaler func(v interface{}) ([]byte, error)
+
 // HTTPClient implements Client using HTTP requests to an SGLang server.
 type HTTPClient struct {
-	config     *Config
-	httpClient *http.Client
+	config      *Config
+	httpClient  *http.Client
+	marshalJSON jsonMarshaler
 }
 
 // NewHTTPClient creates a new SGLang HTTP client.
@@ -96,6 +100,7 @@ func NewHTTPClient(config *Config) *HTTPClient {
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
+		marshalJSON: json.Marshal,
 	}
 }
 
@@ -173,7 +178,11 @@ func (c *HTTPClient) doRequest(
 ) (*http.Response, error) {
 	var bodyReader io.Reader
 	if body != nil {
-		data, err := json.Marshal(body)
+		marshal := c.marshalJSON
+		if marshal == nil {
+			marshal = json.Marshal
+		}
+		data, err := marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request: %w", err)
 		}

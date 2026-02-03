@@ -2,6 +2,7 @@ package gptcache
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -187,8 +188,8 @@ func TestInMemoryCache_SemanticMatcher(t *testing.T) {
 
 func TestConfig_Validate(t *testing.T) {
 	tests := []struct {
-		name     string
-		config   *Config
+		name          string
+		config        *Config
 		wantThreshold float64
 		wantEntries   int
 	}{
@@ -318,4 +319,239 @@ func TestNormalizeL2(t *testing.T) {
 
 func TestInMemoryCache_ImplementsCacheInterface(t *testing.T) {
 	var _ Cache = (*InMemoryCache)(nil)
+}
+
+func TestNewInMemoryCacheWithConfig(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         *Config
+		wantThreshold  float64
+		wantMaxEntries int
+	}{
+		{
+			name:           "nil config uses defaults",
+			config:         nil,
+			wantThreshold:  0.85,
+			wantMaxEntries: 10000,
+		},
+		{
+			name: "valid config is used",
+			config: &Config{
+				SimilarityThreshold: 0.7,
+				MaxEntries:          500,
+				TTL:                 time.Hour,
+			},
+			wantThreshold:  0.7,
+			wantMaxEntries: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := NewInMemoryCacheWithConfig(tt.config)
+			require.NotNil(t, cache)
+			assert.Equal(t, tt.wantThreshold, cache.Config().SimilarityThreshold)
+			assert.Equal(t, tt.wantMaxEntries, cache.Config().MaxEntries)
+		})
+	}
+}
+
+func TestInMemoryCache_Config(t *testing.T) {
+	cache := NewInMemoryCache(WithSimilarityThreshold(0.9))
+	config := cache.Config()
+	require.NotNil(t, config)
+	assert.Equal(t, 0.9, config.SimilarityThreshold)
+}
+
+func TestConfig_Validate_TTL(t *testing.T) {
+	config := &Config{
+		SimilarityThreshold: 0.8,
+		MaxEntries:          100,
+		TTL:                 0,
+	}
+	config.Validate()
+	assert.Equal(t, 24*time.Hour, config.TTL)
+
+	// Test negative TTL.
+	config2 := &Config{
+		SimilarityThreshold: 0.8,
+		MaxEntries:          100,
+		TTL:                 -1 * time.Hour,
+	}
+	config2.Validate()
+	assert.Equal(t, 24*time.Hour, config2.TTL)
+}
+
+func TestConfig_Validate_ThresholdAboveOne(t *testing.T) {
+	config := &Config{
+		SimilarityThreshold: 1.5,
+		MaxEntries:          100,
+		TTL:                 time.Hour,
+	}
+	config.Validate()
+	assert.Equal(t, 0.85, config.SimilarityThreshold)
+}
+
+func TestCosineSimilarity_ZeroNorm(t *testing.T) {
+	// Zero vector has zero norm.
+	vec1 := []float64{0, 0, 0}
+	vec2 := []float64{1, 2, 3}
+	result := CosineSimilarity(vec1, vec2)
+	assert.Equal(t, 0.0, result)
+
+	// Both zero vectors.
+	result2 := CosineSimilarity(vec1, vec1)
+	assert.Equal(t, 0.0, result2)
+}
+
+func TestNormalizeL2_ZeroNorm(t *testing.T) {
+	// Zero vector should be returned unchanged.
+	vec := []float64{0, 0, 0}
+	result := NormalizeL2(vec)
+	assert.Equal(t, vec, result)
+}
+
+func TestEmbeddingMatcher_NilEmbedFunc(t *testing.T) {
+	matcher := &EmbeddingMatcher{EmbedFunc: nil}
+
+	// Exact match.
+	sim, err := matcher.Similarity("hello", "hello")
+	require.NoError(t, err)
+	assert.Equal(t, 1.0, sim)
+
+	// Case-insensitive match.
+	sim, err = matcher.Similarity("Hello", "hello")
+	require.NoError(t, err)
+	assert.Equal(t, 1.0, sim)
+
+	// Match with whitespace.
+	sim, err = matcher.Similarity("  hello  ", "hello")
+	require.NoError(t, err)
+	assert.Equal(t, 1.0, sim)
+
+	// No match.
+	sim, err = matcher.Similarity("hello", "world")
+	require.NoError(t, err)
+	assert.Equal(t, 0.0, sim)
+}
+
+func TestEmbeddingMatcher_EmbedFuncError(t *testing.T) {
+	errEmbed := errors.New("embedding error")
+	matcher := &EmbeddingMatcher{
+		EmbedFunc: func(query string) ([]float64, error) {
+			if query == "error1" {
+				return nil, errEmbed
+			}
+			return []float64{1, 0, 0}, nil
+		},
+	}
+
+	// Error on first query.
+	_, err := matcher.Similarity("error1", "test")
+	assert.ErrorIs(t, err, errEmbed)
+
+	// Error on second query.
+	matcher2 := &EmbeddingMatcher{
+		EmbedFunc: func(query string) ([]float64, error) {
+			if query == "error2" {
+				return nil, errEmbed
+			}
+			return []float64{1, 0, 0}, nil
+		},
+	}
+	_, err = matcher2.Similarity("test", "error2")
+	assert.ErrorIs(t, err, errEmbed)
+}
+
+func TestInMemoryCache_FindSemantic_MatcherError(t *testing.T) {
+	cache := NewInMemoryCache(WithSimilarityThreshold(0.5))
+	ctx := context.Background()
+
+	errMatcher := errors.New("matcher error")
+	cache.SetMatcher(&EmbeddingMatcher{
+		EmbedFunc: func(query string) ([]float64, error) {
+			return nil, errMatcher
+		},
+	})
+
+	require.NoError(t, cache.Set(ctx, "cached query", "cached response"))
+
+	// Matcher error should result in cache miss (entry skipped).
+	_, err := cache.Get(ctx, "search query")
+	assert.ErrorIs(t, err, ErrCacheMiss)
+}
+
+func TestInMemoryCache_FindSemantic_ExpiredEntry(t *testing.T) {
+	cache := NewInMemoryCache(
+		WithSimilarityThreshold(0.5),
+		WithTTL(10*time.Millisecond),
+	)
+	ctx := context.Background()
+
+	// Mock matcher that always returns high similarity.
+	cache.SetMatcher(&EmbeddingMatcher{
+		EmbedFunc: func(query string) ([]float64, error) {
+			return []float64{1, 0, 0}, nil
+		},
+	})
+
+	require.NoError(t, cache.Set(ctx, "query1", "response1"))
+	time.Sleep(20 * time.Millisecond)
+
+	// Entry is expired, should not be returned by semantic search.
+	_, err := cache.Get(ctx, "similar query")
+	assert.ErrorIs(t, err, ErrCacheMiss)
+}
+
+func TestInMemoryCache_FindSemantic_BelowThreshold(t *testing.T) {
+	cache := NewInMemoryCache(WithSimilarityThreshold(0.95))
+	ctx := context.Background()
+
+	// Matcher returns similarity below threshold.
+	cache.SetMatcher(&EmbeddingMatcher{
+		EmbedFunc: func(query string) ([]float64, error) {
+			// Return orthogonal vectors for different queries.
+			if query == "cached" {
+				return []float64{1, 0, 0}, nil
+			}
+			return []float64{0, 1, 0}, nil
+		},
+	})
+
+	require.NoError(t, cache.Set(ctx, "cached", "response"))
+
+	// Low similarity should result in cache miss.
+	_, err := cache.Get(ctx, "different")
+	assert.ErrorIs(t, err, ErrCacheMiss)
+}
+
+func TestInMemoryCache_FindSemantic_BestMatch(t *testing.T) {
+	cache := NewInMemoryCache(WithSimilarityThreshold(0.5))
+	ctx := context.Background()
+
+	cache.SetMatcher(&EmbeddingMatcher{
+		EmbedFunc: func(query string) ([]float64, error) {
+			switch query {
+			case "low":
+				return []float64{0.5, 0.5, 0}, nil
+			case "medium":
+				return []float64{0.8, 0.2, 0}, nil
+			case "high":
+				return []float64{1, 0, 0}, nil
+			case "search":
+				return []float64{1, 0, 0}, nil
+			default:
+				return []float64{0, 0, 1}, nil
+			}
+		},
+	})
+
+	require.NoError(t, cache.Set(ctx, "low", "low response"))
+	require.NoError(t, cache.Set(ctx, "medium", "medium response"))
+	require.NoError(t, cache.Set(ctx, "high", "high response"))
+
+	// Should return the best matching entry.
+	result, err := cache.Get(ctx, "search")
+	require.NoError(t, err)
+	assert.Equal(t, "high response", result.Response)
 }

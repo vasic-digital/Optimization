@@ -246,3 +246,156 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, 3, cfg.MinChunkSize)
 	assert.Equal(t, FlushOnWord, cfg.Strategy)
 }
+
+// Tests for NewStreamBuffer default threshold.
+
+func TestNewStreamBuffer_DefaultThreshold(t *testing.T) {
+	tests := []struct {
+		name      string
+		threshold int
+		expected  int
+	}{
+		{"zero threshold defaults to 5", 0, 5},
+		{"negative threshold defaults to 5", -10, 5},
+		{"positive threshold is kept", 10, 10},
+		{"threshold of 1 is kept", 1, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := NewStreamBuffer(FlushOnSize, tt.threshold)
+			assert.Equal(t, tt.expected, buf.threshold)
+		})
+	}
+}
+
+// Tests for StreamBuffer with unknown strategy (default case).
+
+func TestStreamBuffer_UnknownStrategy(t *testing.T) {
+	// Using an undefined strategy should fall back to word flushing.
+	buf := NewStreamBuffer(FlushStrategy("unknown"), 5)
+
+	result := buf.Add("hello world ")
+	// Should behave like FlushOnWord.
+	assert.Equal(t, []string{"hello ", "world "}, result)
+}
+
+// Tests for NewChunkMerger default minChunkSize.
+
+func TestNewChunkMerger_DefaultMinChunkSize(t *testing.T) {
+	tests := []struct {
+		name     string
+		size     int
+		expected int
+	}{
+		{"zero defaults to 3", 0, 3},
+		{"negative defaults to 3", -5, 3},
+		{"positive is kept", 10, 10},
+		{"one is kept", 1, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			merger := NewChunkMerger(tt.size)
+			assert.Equal(t, tt.expected, merger.minChunkSize)
+		})
+	}
+}
+
+// Tests for NewTokenCounterWithRatio default ratio.
+
+func TestNewTokenCounterWithRatio_DefaultRatio(t *testing.T) {
+	tests := []struct {
+		name     string
+		ratio    float64
+		expected float64
+	}{
+		{"zero defaults to 1.3", 0, 1.3},
+		{"negative defaults to 1.3", -1.0, 1.3},
+		{"positive is kept", 2.0, 2.0},
+		{"small positive is kept", 0.5, 0.5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			counter := NewTokenCounterWithRatio(tt.ratio)
+			assert.Equal(t, tt.expected, counter.TokensPerWord)
+		})
+	}
+}
+
+// Additional tests for StreamBuffer edge cases.
+
+func TestStreamBuffer_FlushOnSentence_MultipleSentenceEnds(t *testing.T) {
+	buf := NewStreamBuffer(FlushOnSentence, 5)
+
+	// Test with question mark.
+	result := buf.Add("What? Really! Yes. ")
+	assert.Equal(t, []string{"What?", "Really!", "Yes."}, result)
+}
+
+func TestStreamBuffer_FlushOnSize_ExactThreshold(t *testing.T) {
+	buf := NewStreamBuffer(FlushOnSize, 3)
+
+	// Add exactly 3 words.
+	result := buf.Add("one two three")
+	assert.Equal(t, []string{"one two three"}, result)
+
+	// Buffer should be empty now.
+	assert.Equal(t, "", buf.Flush())
+}
+
+func TestStreamBuffer_FlushOnLine_MultipleLines(t *testing.T) {
+	buf := NewStreamBuffer(FlushOnLine, 5)
+
+	result := buf.Add("line1\nline2\nline3\n")
+	assert.Equal(t, []string{"line1\n", "line2\n", "line3\n"}, result)
+}
+
+// Tests for ChunkMerger edge cases.
+
+func TestChunkMerger_FlushEmpty(t *testing.T) {
+	merger := NewChunkMerger(5)
+
+	// Flush without adding anything.
+	result := merger.Flush()
+	assert.Equal(t, "", result)
+}
+
+func TestChunkMerger_AddEmptyString(t *testing.T) {
+	merger := NewChunkMerger(3)
+
+	result := merger.Add("")
+	assert.Equal(t, "", result)
+
+	// Add some content.
+	result = merger.Add("one two three")
+	assert.Equal(t, "one two three", result)
+}
+
+// Tests for TokenCounter edge cases.
+
+func TestTokenCounter_CountWithCustomRatio(t *testing.T) {
+	counter := NewTokenCounterWithRatio(2.0)
+
+	// 3 words * 2.0 = 6 tokens.
+	assert.Equal(t, 6, counter.Count("hello world foo"))
+
+	// Empty string should return 0.
+	assert.Equal(t, 0, counter.Count(""))
+}
+
+func TestTokenCounter_CountCharacters_Unicode(t *testing.T) {
+	counter := NewTokenCounter()
+
+	// Unicode characters should be counted correctly.
+	assert.Equal(t, 5, counter.CountCharacters("Hello"))
+
+	// Korean characters (each is one rune).
+	assert.Equal(t, 2, counter.CountCharacters("\ud55c\uae00"))
+
+	// Emoji (each emoji is typically one or more runes).
+	// Simple emoji.
+	text := "\U0001F600" // Grinning face.
+	assert.Equal(t, 1, counter.CountCharacters(text))
+}

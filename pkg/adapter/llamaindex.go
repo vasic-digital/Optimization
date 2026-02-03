@@ -75,8 +75,9 @@ func DefaultLlamaIndexConfig() *LlamaIndexConfig {
 
 // LlamaIndexHTTPAdapter implements LlamaIndexAdapter using HTTP.
 type LlamaIndexHTTPAdapter struct {
-	config     *LlamaIndexConfig
-	httpClient *http.Client
+	config      *LlamaIndexConfig
+	httpClient  *http.Client
+	marshalJSON jsonMarshaler
 }
 
 // NewLlamaIndexHTTPAdapter creates a new LlamaIndex HTTP adapter.
@@ -89,6 +90,7 @@ func NewLlamaIndexHTTPAdapter(config *LlamaIndexConfig) *LlamaIndexHTTPAdapter {
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
+		marshalJSON: json.Marshal,
 	}
 }
 
@@ -176,7 +178,11 @@ func (a *LlamaIndexHTTPAdapter) doRequest(
 ) (*http.Response, error) {
 	var bodyReader io.Reader
 	if body != nil {
-		data, err := json.Marshal(body)
+		marshal := a.marshalJSON
+		if marshal == nil {
+			marshal = json.Marshal
+		}
+		data, err := marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request: %w", err)
 		}

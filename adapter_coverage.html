@@ -1,0 +1,537 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>adapter: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">digital.vasic.optimization/pkg/adapter/langchain.go (96.2%)</option>
+				
+				<option value="file1">digital.vasic.optimization/pkg/adapter/llamaindex.go (96.3%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package adapter
+
+import (
+        "bytes"
+        "context"
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+        "time"
+)
+
+// LangChainAdapter defines the interface for LangChain integration.
+type LangChainAdapter interface {
+        // ExecuteChain executes a LangChain chain and returns the result.
+        ExecuteChain(
+                ctx context.Context,
+                chainType string,
+                prompt string,
+                variables map[string]interface{},
+        ) (*ChainResult, error)
+        // Decompose decomposes a task into subtasks.
+        Decompose(
+                ctx context.Context,
+                task string,
+                maxSteps int,
+        ) (*DecomposeResult, error)
+        // Health checks if the service is available.
+        Health(ctx context.Context) error
+}
+
+// ChainResult represents a chain execution result.
+type ChainResult struct {
+        // Result is the chain output.
+        Result string `json:"result"`
+        // Steps are the execution steps.
+        Steps []ChainStep `json:"steps"`
+}
+
+// ChainStep represents a step in chain execution.
+type ChainStep struct {
+        // Step is the step name.
+        Step string `json:"step"`
+        // Input is the step input.
+        Input string `json:"input,omitempty"`
+        // Output is the step output.
+        Output string `json:"output,omitempty"`
+}
+
+// DecomposeResult represents a task decomposition result.
+type DecomposeResult struct {
+        // Subtasks are the decomposed subtasks.
+        Subtasks []Subtask `json:"subtasks"`
+        // Reasoning explains the decomposition.
+        Reasoning string `json:"reasoning"`
+}
+
+// Subtask represents a decomposed subtask.
+type Subtask struct {
+        // ID is the subtask ID.
+        ID int `json:"id"`
+        // Description describes the subtask.
+        Description string `json:"description"`
+        // Dependencies are IDs of prerequisite subtasks.
+        Dependencies []int `json:"dependencies"`
+        // Complexity indicates the subtask complexity.
+        Complexity string `json:"complexity"`
+}
+
+// LangChainConfig holds configuration for the LangChain adapter.
+type LangChainConfig struct {
+        // BaseURL is the LangChain service URL.
+        BaseURL string `json:"base_url"`
+        // Timeout is the request timeout.
+        Timeout time.Duration `json:"timeout"`
+}
+
+// DefaultLangChainConfig returns a default configuration.
+func DefaultLangChainConfig() *LangChainConfig <span class="cov8" title="1">{
+        return &amp;LangChainConfig{
+                BaseURL: "http://localhost:8011",
+                Timeout: 120 * time.Second,
+        }
+}</span>
+
+// LangChainHTTPAdapter implements LangChainAdapter using HTTP.
+type LangChainHTTPAdapter struct {
+        config     *LangChainConfig
+        httpClient *http.Client
+}
+
+// NewLangChainHTTPAdapter creates a new LangChain HTTP adapter.
+func NewLangChainHTTPAdapter(config *LangChainConfig) *LangChainHTTPAdapter <span class="cov8" title="1">{
+        if config == nil </span><span class="cov8" title="1">{
+                config = DefaultLangChainConfig()
+        }</span>
+        <span class="cov8" title="1">return &amp;LangChainHTTPAdapter{
+                config: config,
+                httpClient: &amp;http.Client{
+                        Timeout: config.Timeout,
+                },
+        }</span>
+}
+
+// ExecuteChain executes a LangChain chain via HTTP.
+func (a *LangChainHTTPAdapter) ExecuteChain(
+        ctx context.Context,
+        chainType string,
+        prompt string,
+        variables map[string]interface{},
+) (*ChainResult, error) <span class="cov8" title="1">{
+        type chainReq struct {
+                ChainType   string                 `json:"chain_type"`
+                Prompt      string                 `json:"prompt"`
+                Variables   map[string]interface{} `json:"variables,omitempty"`
+                Temperature float64                `json:"temperature"`
+        }
+
+        resp, err := a.doRequest(ctx, "POST", "/chain", &amp;chainReq{
+                ChainType:   chainType,
+                Prompt:      prompt,
+                Variables:   variables,
+                Temperature: 0.7,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+
+        <span class="cov8" title="1">var result ChainResult
+        if err := json.NewDecoder(resp.Body).Decode(&amp;result); err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("failed to decode response: %w", err)
+        }</span>
+        <span class="cov8" title="1">return &amp;result, nil</span>
+}
+
+// Decompose decomposes a task via the LangChain service.
+func (a *LangChainHTTPAdapter) Decompose(
+        ctx context.Context,
+        task string,
+        maxSteps int,
+) (*DecomposeResult, error) <span class="cov8" title="1">{
+        if maxSteps &lt;= 0 </span><span class="cov8" title="1">{
+                maxSteps = 5
+        }</span>
+
+        <span class="cov8" title="1">type decomposeReq struct {
+                Task     string `json:"task"`
+                MaxSteps int    `json:"max_steps"`
+        }
+
+        resp, err := a.doRequest(ctx, "POST", "/decompose", &amp;decomposeReq{
+                Task:     task,
+                MaxSteps: maxSteps,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+
+        <span class="cov8" title="1">var result DecomposeResult
+        if err := json.NewDecoder(resp.Body).Decode(&amp;result); err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("failed to decode response: %w", err)
+        }</span>
+        <span class="cov8" title="1">return &amp;result, nil</span>
+}
+
+// Health checks if the LangChain service is available.
+func (a *LangChainHTTPAdapter) Health(ctx context.Context) error <span class="cov8" title="1">{
+        resp, err := a.doRequest(ctx, "GET", "/health", nil)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("health check failed: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (a *LangChainHTTPAdapter) doRequest(
+        ctx context.Context,
+        method, path string,
+        body interface{},
+) (*http.Response, error) <span class="cov8" title="1">{
+        var bodyReader io.Reader
+        if body != nil </span><span class="cov8" title="1">{
+                data, err := json.Marshal(body)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to marshal request: %w", err)
+                }</span>
+                <span class="cov8" title="1">bodyReader = bytes.NewReader(data)</span>
+        }
+
+        <span class="cov8" title="1">req, err := http.NewRequestWithContext(
+                ctx, method, a.config.BaseURL+path, bodyReader,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create request: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if body != nil </span><span class="cov8" title="1">{
+                req.Header.Set("Content-Type", "application/json")
+        }</span>
+
+        <span class="cov8" title="1">resp, err := a.httpClient.Do(req)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("request failed: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if resp.StatusCode &gt;= 400 </span><span class="cov8" title="1">{
+                defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+                <span class="cov8" title="1">bodyBytes, _ := io.ReadAll(resp.Body)
+                return nil, fmt.Errorf(
+                        "request failed with status %d: %s",
+                        resp.StatusCode, string(bodyBytes),
+                )</span>
+        }
+
+        <span class="cov8" title="1">return resp, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package adapter provides LLM framework adapters for integrating
+// with LlamaIndex, LangChain, and other frameworks via HTTP clients.
+package adapter
+
+import (
+        "bytes"
+        "context"
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+        "time"
+)
+
+// LlamaIndexAdapter defines the interface for LlamaIndex integration.
+type LlamaIndexAdapter interface {
+        // Query queries documents and returns an answer with sources.
+        Query(ctx context.Context, query string, topK int) (*QueryResult, error)
+        // Rerank reranks documents by query relevance.
+        Rerank(
+                ctx context.Context,
+                query string,
+                documents []string,
+                topK int,
+        ) ([]RankedDocument, error)
+        // Health checks if the service is available.
+        Health(ctx context.Context) error
+}
+
+// QueryResult represents a document query result.
+type QueryResult struct {
+        // Answer is the generated answer.
+        Answer string `json:"answer"`
+        // Sources are the source documents used.
+        Sources []Source `json:"sources"`
+        // Confidence is the confidence score.
+        Confidence float64 `json:"confidence"`
+}
+
+// Source represents a document source.
+type Source struct {
+        // Content is the source content.
+        Content string `json:"content"`
+        // Score is the relevance score.
+        Score float64 `json:"score"`
+        // Metadata contains additional metadata.
+        Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// RankedDocument represents a reranked document.
+type RankedDocument struct {
+        // Content is the document content.
+        Content string `json:"content"`
+        // Score is the relevance score.
+        Score float64 `json:"score"`
+        // Rank is the position in the ranking.
+        Rank int `json:"rank"`
+}
+
+// LlamaIndexConfig holds configuration for the LlamaIndex adapter.
+type LlamaIndexConfig struct {
+        // BaseURL is the LlamaIndex service URL.
+        BaseURL string `json:"base_url"`
+        // Timeout is the request timeout.
+        Timeout time.Duration `json:"timeout"`
+}
+
+// DefaultLlamaIndexConfig returns a default configuration.
+func DefaultLlamaIndexConfig() *LlamaIndexConfig <span class="cov8" title="1">{
+        return &amp;LlamaIndexConfig{
+                BaseURL: "http://localhost:8012",
+                Timeout: 120 * time.Second,
+        }
+}</span>
+
+// LlamaIndexHTTPAdapter implements LlamaIndexAdapter using HTTP.
+type LlamaIndexHTTPAdapter struct {
+        config     *LlamaIndexConfig
+        httpClient *http.Client
+}
+
+// NewLlamaIndexHTTPAdapter creates a new LlamaIndex HTTP adapter.
+func NewLlamaIndexHTTPAdapter(config *LlamaIndexConfig) *LlamaIndexHTTPAdapter <span class="cov8" title="1">{
+        if config == nil </span><span class="cov8" title="1">{
+                config = DefaultLlamaIndexConfig()
+        }</span>
+        <span class="cov8" title="1">return &amp;LlamaIndexHTTPAdapter{
+                config: config,
+                httpClient: &amp;http.Client{
+                        Timeout: config.Timeout,
+                },
+        }</span>
+}
+
+// Query queries documents via the LlamaIndex service.
+func (a *LlamaIndexHTTPAdapter) Query(
+        ctx context.Context,
+        query string,
+        topK int,
+) (*QueryResult, error) <span class="cov8" title="1">{
+        if topK &lt;= 0 </span><span class="cov8" title="1">{
+                topK = 5
+        }</span>
+
+        <span class="cov8" title="1">type queryReq struct {
+                Query string `json:"query"`
+                TopK  int    `json:"top_k"`
+        }
+
+        resp, err := a.doRequest(ctx, "POST", "/query", &amp;queryReq{
+                Query: query,
+                TopK:  topK,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+
+        <span class="cov8" title="1">var result QueryResult
+        if err := json.NewDecoder(resp.Body).Decode(&amp;result); err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("failed to decode response: %w", err)
+        }</span>
+        <span class="cov8" title="1">return &amp;result, nil</span>
+}
+
+// Rerank reranks documents via the LlamaIndex service.
+func (a *LlamaIndexHTTPAdapter) Rerank(
+        ctx context.Context,
+        query string,
+        documents []string,
+        topK int,
+) ([]RankedDocument, error) <span class="cov8" title="1">{
+        if topK &lt;= 0 </span><span class="cov8" title="1">{
+                topK = 5
+        }</span>
+
+        <span class="cov8" title="1">type rerankReq struct {
+                Query     string   `json:"query"`
+                Documents []string `json:"documents"`
+                TopK      int      `json:"top_k"`
+        }
+
+        resp, err := a.doRequest(ctx, "POST", "/rerank", &amp;rerankReq{
+                Query:     query,
+                Documents: documents,
+                TopK:      topK,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+
+        <span class="cov8" title="1">var result struct {
+                RankedDocuments []RankedDocument `json:"ranked_documents"`
+        }
+        if err := json.NewDecoder(resp.Body).Decode(&amp;result); err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("failed to decode response: %w", err)
+        }</span>
+        <span class="cov8" title="1">return result.RankedDocuments, nil</span>
+}
+
+// Health checks if the LlamaIndex service is available.
+func (a *LlamaIndexHTTPAdapter) Health(ctx context.Context) error <span class="cov8" title="1">{
+        resp, err := a.doRequest(ctx, "GET", "/health", nil)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("health check failed: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (a *LlamaIndexHTTPAdapter) doRequest(
+        ctx context.Context,
+        method, path string,
+        body interface{},
+) (*http.Response, error) <span class="cov8" title="1">{
+        var bodyReader io.Reader
+        if body != nil </span><span class="cov8" title="1">{
+                data, err := json.Marshal(body)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to marshal request: %w", err)
+                }</span>
+                <span class="cov8" title="1">bodyReader = bytes.NewReader(data)</span>
+        }
+
+        <span class="cov8" title="1">req, err := http.NewRequestWithContext(
+                ctx, method, a.config.BaseURL+path, bodyReader,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to create request: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if body != nil </span><span class="cov8" title="1">{
+                req.Header.Set("Content-Type", "application/json")
+        }</span>
+
+        <span class="cov8" title="1">resp, err := a.httpClient.Do(req)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("request failed: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if resp.StatusCode &gt;= 400 </span><span class="cov8" title="1">{
+                defer func() </span><span class="cov8" title="1">{ _ = resp.Body.Close() }</span>()
+                <span class="cov8" title="1">bodyBytes, _ := io.ReadAll(resp.Body)
+                return nil, fmt.Errorf(
+                        "request failed with status %d: %s",
+                        resp.StatusCode, string(bodyBytes),
+                )</span>
+        }
+
+        <span class="cov8" title="1">return resp, nil</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

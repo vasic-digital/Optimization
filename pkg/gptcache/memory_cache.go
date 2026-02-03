@@ -23,7 +23,7 @@ type cacheEntry struct {
 type InMemoryCache struct {
 	mu      sync.RWMutex
 	entries map[string]*cacheEntry // hash -> entry
-	order   []string              // insertion order for eviction
+	order   []string               // insertion order for eviction
 	config  *Config
 	matcher SemanticMatcher
 }

@@ -106,14 +106,16 @@ func (c *RegexConstrainer) Constrain(
 	_ *Schema,
 ) (string, error) {
 	output = strings.TrimSpace(output)
-	if c.pattern.MatchString(output) {
-		return output, nil
-	}
 
-	// Try to find a matching substring.
-	match := c.pattern.FindString(output)
-	if match != "" {
-		return match, nil
+	// Check if the pattern matches anywhere in the output.
+	if c.pattern.MatchString(output) {
+		// Pattern found in output; return the matched substring for better precision.
+		match := c.pattern.FindString(output)
+		if match != "" {
+			return match, nil
+		}
+		// Fallback to full output if FindString somehow returns empty.
+		return output, nil
 	}
 
 	return output, fmt.Errorf(
@@ -405,6 +407,20 @@ func extractJSON(response string) string {
 	}
 
 	return ""
+}
+
+// ValidateValue validates a single value against a schema.
+// This is exported for testing purposes to allow direct validation
+// of non-JSON data sources (e.g., int values instead of float64).
+func ValidateValue(
+	data interface{},
+	schema *Schema,
+	path string,
+) *ValidationResult {
+	result := &ValidationResult{Valid: true}
+	validateValue(data, schema, path, result)
+	result.Data = data
+	return result
 }
 
 func findMatchingBrace(s string, open, close byte) int {
