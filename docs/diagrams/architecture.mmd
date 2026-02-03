@@ -1,0 +1,53 @@
+%% Package Relationship Diagram - digital.vasic.optimization
+%% All packages are independent (no cross-package imports).
+%% Composition happens at the consumer level.
+
+graph TB
+    subgraph "digital.vasic.optimization"
+        direction TB
+
+        subgraph "Core Optimization"
+            gptcache["<b>gptcache</b><br/>Semantic Caching<br/><i>Cache, SemanticMatcher</i><br/><i>InMemoryCache, EmbeddingMatcher</i>"]
+            prompt["<b>prompt</b><br/>Prompt Optimization<br/><i>Optimizer</i><br/><i>Compressor, Template, TemplateRegistry</i>"]
+            streaming["<b>streaming</b><br/>Streaming Optimization<br/><i>Buffer</i><br/><i>StreamBuffer, TokenCounter, ChunkMerger</i>"]
+            outlines["<b>outlines</b><br/>Structured Output<br/><i>Constrainer</i><br/><i>JSONConstrainer, RegexConstrainer, Schema</i>"]
+        end
+
+        subgraph "External Integrations"
+            sglang["<b>sglang</b><br/>SGLang Client<br/><i>Client</i><br/><i>HTTPClient, Program</i>"]
+            adapter["<b>adapter</b><br/>Framework Adapters<br/><i>LlamaIndexAdapter, LangChainAdapter</i><br/><i>LlamaIndexHTTPAdapter, LangChainHTTPAdapter</i>"]
+        end
+    end
+
+    subgraph "Consumer Layer (e.g. HelixAgent)"
+        consumer["Integration Code<br/><i>Composes all packages</i>"]
+    end
+
+    subgraph "External Services"
+        sglang_svc["SGLang Server<br/>:30000"]
+        llamaindex_svc["LlamaIndex Service<br/>:8012"]
+        langchain_svc["LangChain Service<br/>:8011"]
+        embedding_svc["Embedding Provider<br/>(OpenAI, Cohere, etc.)"]
+    end
+
+    consumer --> gptcache
+    consumer --> prompt
+    consumer --> streaming
+    consumer --> outlines
+    consumer --> sglang
+    consumer --> adapter
+
+    sglang -.->|HTTP| sglang_svc
+    adapter -.->|HTTP| llamaindex_svc
+    adapter -.->|HTTP| langchain_svc
+    gptcache -.->|via EmbedFunc| embedding_svc
+
+    classDef core fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef integration fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef external fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef consumer fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    class gptcache,prompt,streaming,outlines core
+    class sglang,adapter integration
+    class sglang_svc,llamaindex_svc,langchain_svc,embedding_svc external
+    class consumer consumer

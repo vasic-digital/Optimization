@@ -1,0 +1,95 @@
+%% Sequence Diagram: Cache-Hit Optimization Flow
+%% Shows the full pipeline from user query through
+%% prompt optimization, cache lookup, LLM call, output
+%% constraining, and cache storage.
+
+sequenceDiagram
+    participant User
+    participant Pipeline as Integration Pipeline
+    participant Compressor as prompt.Compressor
+    participant Cache as gptcache.InMemoryCache
+    participant Matcher as gptcache.EmbeddingMatcher
+    participant EmbedAPI as Embedding Provider
+    participant LLM as LLM Provider
+    participant Constrainer as outlines.JSONConstrainer
+    participant StreamBuf as streaming.StreamBuffer
+
+    User->>Pipeline: Submit query
+
+    %% Step 1: Prompt Optimization
+    Pipeline->>Compressor: Optimize(ctx, query)
+    Compressor->>Compressor: normalizeWhitespace()
+    Compressor->>Compressor: removeRedundantPhrases()
+    Compressor->>Compressor: truncateToTokens()
+    Compressor-->>Pipeline: optimizedQuery
+
+    %% Step 2: Cache Lookup (Exact Match)
+    Pipeline->>Cache: Get(ctx, optimizedQuery)
+    Cache->>Cache: hashQuery(optimizedQuery)
+    Cache->>Cache: Lookup hash in entries map
+
+    alt Exact Hash Match Found
+        Cache->>Cache: Check TTL expiry
+        alt Entry Not Expired
+            Cache-->>Pipeline: CachedResponse (similarity=1.0)
+            Pipeline-->>User: Return cached response
+        else Entry Expired
+            Cache->>Cache: Continue to semantic match
+        end
+    end
+
+    alt No Exact Match & Matcher Configured
+        Cache->>Matcher: Similarity(optimizedQuery, cachedQuery)
+        Matcher->>EmbedAPI: Embed(optimizedQuery)
+        EmbedAPI-->>Matcher: embedding vector 1
+        Matcher->>EmbedAPI: Embed(cachedQuery)
+        EmbedAPI-->>Matcher: embedding vector 2
+        Matcher->>Matcher: CosineSimilarity(vec1, vec2)
+        Matcher->>Matcher: Normalize [-1,1] to [0,1]
+        Matcher-->>Cache: similarity score
+
+        alt Similarity >= Threshold
+            Cache-->>Pipeline: CachedResponse (similarity=score)
+            Pipeline-->>User: Return semantically matched response
+        else Similarity < Threshold
+            Cache-->>Pipeline: ErrCacheMiss
+        end
+    end
+
+    alt Cache Miss
+        %% Step 3: LLM Generation
+        Pipeline->>LLM: Generate(optimizedQuery)
+
+        alt Streaming Enabled
+            loop Token Stream
+                LLM-->>StreamBuf: token chunk
+                StreamBuf->>StreamBuf: Add(chunk)
+                StreamBuf-->>Pipeline: flushed content (per strategy)
+            end
+            StreamBuf->>StreamBuf: Flush() remaining
+            StreamBuf-->>Pipeline: final content
+        else Non-Streaming
+            LLM-->>Pipeline: complete response
+        end
+
+        %% Step 4: Output Constraining
+        Pipeline->>Constrainer: Constrain(response, schema)
+        Constrainer->>Constrainer: extractJSON(response)
+        Constrainer->>Constrainer: Validate(jsonStr, schema)
+
+        alt Valid JSON
+            Constrainer-->>Pipeline: constrained JSON output
+        else Invalid
+            Constrainer-->>Pipeline: error (validation failed)
+            Pipeline-->>User: Return error
+        end
+
+        %% Step 5: Cache Storage
+        Pipeline->>Cache: Set(ctx, optimizedQuery, constrainedOutput)
+        Cache->>Cache: hashQuery(optimizedQuery)
+        Cache->>Cache: Store entry with timestamp
+        Cache->>Cache: evictIfNeeded()
+        Cache-->>Pipeline: success
+
+        Pipeline-->>User: Return constrained response
+    end

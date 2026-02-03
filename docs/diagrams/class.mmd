@@ -1,0 +1,299 @@
+%% Class Diagram: Interfaces and Implementations
+%% digital.vasic.optimization
+
+classDiagram
+    direction TB
+
+    %% ===== gptcache =====
+    class Cache {
+        <<interface>>
+        +Get(ctx Context, query string) (*CachedResponse, error)
+        +Set(ctx Context, query string, response string) error
+        +Invalidate(ctx Context, query string) error
+    }
+
+    class SemanticMatcher {
+        <<interface>>
+        +Similarity(query1 string, query2 string) (float64, error)
+    }
+
+    class InMemoryCache {
+        -mu RWMutex
+        -entries map~string, *cacheEntry~
+        -order []string
+        -config *Config
+        -matcher SemanticMatcher
+        +Get(ctx Context, query string) (*CachedResponse, error)
+        +Set(ctx Context, query string, response string) error
+        +Invalidate(ctx Context, query string) error
+        +SetMatcher(matcher SemanticMatcher)
+        +Size() int
+        +Clear()
+        +Config() *Config
+    }
+
+    class EmbeddingMatcher {
+        +EmbedFunc func(string) ([]float64, error)
+        +Similarity(query1 string, query2 string) (float64, error)
+    }
+
+    class CachedResponse {
+        +Response string
+        +Similarity float64
+        +CachedAt Time
+        +TTL Duration
+        +Metadata map~string, interface~
+    }
+
+    class gptcacheConfig["Config"] {
+        +SimilarityThreshold float64
+        +MaxEntries int
+        +TTL Duration
+        +Validate()
+    }
+
+    Cache <|.. InMemoryCache : implements
+    SemanticMatcher <|.. EmbeddingMatcher : implements
+    InMemoryCache --> SemanticMatcher : uses (optional)
+    InMemoryCache --> gptcacheConfig : has
+    InMemoryCache --> CachedResponse : returns
+
+    %% ===== prompt =====
+    class Optimizer {
+        <<interface>>
+        +Optimize(ctx Context, prompt string) (string, error)
+    }
+
+    class Compressor {
+        -config *promptConfig
+        +Optimize(ctx Context, prompt string) (string, error)
+    }
+
+    class Template {
+        +Name string
+        +Content string
+        +Description string
+        +Variables []string
+        +Render(vars map~string, string~) (string, error)
+    }
+
+    class TemplateRegistry {
+        -mu RWMutex
+        -templates map~string, *Template~
+        +Register(template *Template) error
+        +Get(name string) (*Template, error)
+        +Remove(name string)
+        +List() []string
+        +Size() int
+        +RenderTemplate(name string, vars map~string, string~) (string, error)
+    }
+
+    class promptConfig["Config"] {
+        +MaxTokens int
+        +PreserveInstructions bool
+        +RemoveRedundancy bool
+    }
+
+    Optimizer <|.. Compressor : implements
+    Compressor --> promptConfig : has
+    TemplateRegistry --> Template : manages
+
+    %% ===== streaming =====
+    class Buffer {
+        <<interface>>
+        +Add(text string) []string
+        +Flush() string
+        +Reset()
+    }
+
+    class StreamBuffer {
+        -buffer Builder
+        -strategy FlushStrategy
+        -threshold int
+        +Add(text string) []string
+        +Flush() string
+        +Reset()
+    }
+
+    class TokenCounter {
+        +TokensPerWord float64
+        +Count(text string) int
+        +CountWords(text string) int
+        +CountCharacters(text string) int
+        +Fits(text string, limit int) bool
+    }
+
+    class ChunkMerger {
+        -buffer Builder
+        -minChunkSize int
+        -tokenCounter *TokenCounter
+        +Add(chunk string) string
+        +Flush() string
+        +Reset()
+    }
+
+    class FlushStrategy {
+        <<enumeration>>
+        FlushOnWord
+        FlushOnSentence
+        FlushOnLine
+        FlushOnSize
+    }
+
+    Buffer <|.. StreamBuffer : implements
+    StreamBuffer --> FlushStrategy : uses
+    ChunkMerger --> TokenCounter : uses
+
+    %% ===== outlines =====
+    class Constrainer {
+        <<interface>>
+        +Constrain(output string, schema *Schema) (string, error)
+    }
+
+    class JSONConstrainer {
+        +Constrain(output string, schema *Schema) (string, error)
+    }
+
+    class RegexConstrainer {
+        -pattern *Regexp
+        +Constrain(output string, schema *Schema) (string, error)
+    }
+
+    class Schema {
+        +Type string
+        +Properties map~string, *Schema~
+        +Required []string
+        +Items *Schema
+        +Enum []interface
+        +MinLength *int
+        +MaxLength *int
+        +Minimum *float64
+        +Maximum *float64
+        +Pattern string
+        +Description string
+        +String() string
+        +IsRequired(property string) bool
+    }
+
+    class SchemaBuilder {
+        -schema *Schema
+        +Object() *SchemaBuilder
+        +Array() *SchemaBuilder
+        +StringType() *SchemaBuilder
+        +NumberType() *SchemaBuilder
+        +IntegerType() *SchemaBuilder
+        +BooleanType() *SchemaBuilder
+        +Property(name string, schema *Schema) *SchemaBuilder
+        +RequiredProps(properties ...string) *SchemaBuilder
+        +Items(schema *Schema) *SchemaBuilder
+        +EnumValues(values ...interface) *SchemaBuilder
+        +SetPattern(pattern string) *SchemaBuilder
+        +SetDescription(desc string) *SchemaBuilder
+        +Build() *Schema
+    }
+
+    class ValidationResult {
+        +Valid bool
+        +Errors []*ValidationError
+        +Data interface
+        +AddError(path string, message string)
+        +ErrorMessages() []string
+    }
+
+    class ValidationError {
+        +Path string
+        +Message string
+        +Error() string
+    }
+
+    Constrainer <|.. JSONConstrainer : implements
+    Constrainer <|.. RegexConstrainer : implements
+    JSONConstrainer --> Schema : validates against
+    SchemaBuilder --> Schema : builds
+    ValidationResult --> ValidationError : contains
+
+    %% ===== sglang =====
+    class Client {
+        <<interface>>
+        +Generate(ctx Context, program *Program) (string, error)
+        +Health(ctx Context) error
+    }
+
+    class HTTPClient {
+        -config *sglangConfig
+        -httpClient *http.Client
+        +Generate(ctx Context, program *Program) (string, error)
+        +Health(ctx Context) error
+    }
+
+    class Program {
+        +SystemPrompt string
+        +UserPrompt string
+        +Temperature float64
+        +MaxTokens int
+        +TopP float64
+        +Stop []string
+    }
+
+    class sglangConfig["Config"] {
+        +Endpoint string
+        +Model string
+        +Timeout Duration
+    }
+
+    Client <|.. HTTPClient : implements
+    HTTPClient --> sglangConfig : has
+    HTTPClient --> Program : executes
+
+    %% ===== adapter =====
+    class LlamaIndexAdapter {
+        <<interface>>
+        +Query(ctx Context, query string, topK int) (*QueryResult, error)
+        +Rerank(ctx Context, query string, documents []string, topK int) ([]RankedDocument, error)
+        +Health(ctx Context) error
+    }
+
+    class LangChainAdapter {
+        <<interface>>
+        +ExecuteChain(ctx Context, chainType string, prompt string, variables map) (*ChainResult, error)
+        +Decompose(ctx Context, task string, maxSteps int) (*DecomposeResult, error)
+        +Health(ctx Context) error
+    }
+
+    class LlamaIndexHTTPAdapter {
+        -config *LlamaIndexConfig
+        -httpClient *http.Client
+        +Query(ctx Context, query string, topK int) (*QueryResult, error)
+        +Rerank(ctx Context, query string, documents []string, topK int) ([]RankedDocument, error)
+        +Health(ctx Context) error
+    }
+
+    class LangChainHTTPAdapter {
+        -config *LangChainConfig
+        -httpClient *http.Client
+        +ExecuteChain(ctx Context, chainType string, prompt string, variables map) (*ChainResult, error)
+        +Decompose(ctx Context, task string, maxSteps int) (*DecomposeResult, error)
+        +Health(ctx Context) error
+    }
+
+    class QueryResult {
+        +Answer string
+        +Sources []Source
+        +Confidence float64
+    }
+
+    class ChainResult {
+        +Result string
+        +Steps []ChainStep
+    }
+
+    class DecomposeResult {
+        +Subtasks []Subtask
+        +Reasoning string
+    }
+
+    LlamaIndexAdapter <|.. LlamaIndexHTTPAdapter : implements
+    LangChainAdapter <|.. LangChainHTTPAdapter : implements
+    LlamaIndexHTTPAdapter --> QueryResult : returns
+    LangChainHTTPAdapter --> ChainResult : returns
+    LangChainHTTPAdapter --> DecomposeResult : returns
