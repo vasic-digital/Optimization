@@ -10,15 +10,14 @@ same session as the change.** Coverage and green suites are not evidence.
 
 ### Acceptance demo for this module
 
-<!-- TODO: replace this block with the exact command(s) that exercise this
-     module end-to-end against real dependencies, and the expected output.
-     The commands must run the real artifact (built binary, deployed
-     container, real service) — no in-process fakes, no mocks, no
-     `httptest.NewServer`, no Robolectric, no JSDOM as proof of done. -->
-
 ```bash
-# TODO
+# Semantic cache hits+eviction + prompt compression end-to-end
+cd Optimization && GOMAXPROCS=2 nice -n 19 go test -count=1 -race -v \
+  -run 'TestCacheWithSemanticMatcher_Integration|TestCacheEviction_Integration|TestPromptCompressorWithTemplates_Integration' \
+  ./tests/integration/...
 ```
+Expect: three tests PASS; gptcache-style similarity matching + compression on real embeddings.
+
 
 ## Overview
 
