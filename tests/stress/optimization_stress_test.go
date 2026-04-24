@@ -16,7 +16,7 @@ import (
 
 func TestCacheConcurrentAccess_Stress(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cache := gptcache.NewInMemoryCache(
@@ -72,7 +72,7 @@ func TestCacheConcurrentAccess_Stress(t *testing.T) {
 
 func TestTemplateRegistryConcurrent_Stress(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prompt.NewTemplateRegistry()
@@ -127,7 +127,7 @@ func TestTemplateRegistryConcurrent_Stress(t *testing.T) {
 
 func TestStreamBufferConcurrent_Stress(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	const goroutines = 50
@@ -162,7 +162,7 @@ func TestStreamBufferConcurrent_Stress(t *testing.T) {
 
 func TestCacheHighThroughput_Stress(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cache := gptcache.NewInMemoryCache(
@@ -189,7 +189,7 @@ func TestCacheHighThroughput_Stress(t *testing.T) {
 
 func TestSimilarityComputation_Stress(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	const goroutines = 50

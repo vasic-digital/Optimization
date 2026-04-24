@@ -14,7 +14,7 @@ import (
 
 func TestCache_EmptyQueryRejection(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cache := gptcache.NewInMemoryCache()
@@ -33,7 +33,7 @@ func TestCache_EmptyQueryRejection(t *testing.T) {
 
 func TestCache_LargeInputHandling(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cache := gptcache.NewInMemoryCache(
@@ -53,7 +53,7 @@ func TestCache_LargeInputHandling(t *testing.T) {
 
 func TestTemplate_InjectionResistance(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prompt.NewTemplateRegistry()
@@ -86,7 +86,7 @@ func TestTemplate_InjectionResistance(t *testing.T) {
 
 func TestTemplate_NilAndEmptyRegistration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prompt.NewTemplateRegistry()
@@ -102,7 +102,7 @@ func TestTemplate_NilAndEmptyRegistration(t *testing.T) {
 
 func TestSchemaValidation_MaliciousJSON(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	schema := outlines.ObjectSchema(
@@ -132,7 +132,7 @@ func TestSchemaValidation_MaliciousJSON(t *testing.T) {
 
 func TestRegexConstrainer_ReDoS(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	// Test that regex constrainer handles patterns safely
@@ -155,7 +155,7 @@ func TestRegexConstrainer_ReDoS(t *testing.T) {
 
 func TestRegexConstrainer_InvalidPattern(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	_, err := outlines.NewRegexConstrainer("[invalid")
@@ -164,7 +164,7 @@ func TestRegexConstrainer_InvalidPattern(t *testing.T) {
 
 func TestConfigValidation_BoundaryValues(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	testCases := []struct {

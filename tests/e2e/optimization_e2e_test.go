@@ -16,7 +16,7 @@ import (
 
 func TestFullCachingPipeline_E2E(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cache := gptcache.NewInMemoryCache(
@@ -66,7 +66,7 @@ func TestFullCachingPipeline_E2E(t *testing.T) {
 
 func TestPromptOptimizationPipeline_E2E(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	// Step 1: Create and register templates
@@ -104,7 +104,7 @@ func TestPromptOptimizationPipeline_E2E(t *testing.T) {
 
 func TestStreamingPipeline_E2E(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	// Simulate a streaming response pipeline
@@ -148,7 +148,7 @@ func TestStreamingPipeline_E2E(t *testing.T) {
 
 func TestSchemaConstrainingPipeline_E2E(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	// Build schema for expected API response
@@ -181,7 +181,7 @@ func TestSchemaConstrainingPipeline_E2E(t *testing.T) {
 
 func TestTokenCounting_E2E(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	counter := streaming.NewTokenCounter()

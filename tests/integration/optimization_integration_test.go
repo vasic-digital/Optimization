@@ -16,7 +16,7 @@ import (
 
 func TestCacheWithSemanticMatcher_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cache := gptcache.NewInMemoryCache(
@@ -49,7 +49,7 @@ func TestCacheWithSemanticMatcher_Integration(t *testing.T) {
 
 func TestCacheEviction_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cache := gptcache.NewInMemoryCache(
@@ -69,7 +69,7 @@ func TestCacheEviction_Integration(t *testing.T) {
 
 func TestPromptCompressorWithTemplates_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	// Create template registry
@@ -108,7 +108,7 @@ func TestPromptCompressorWithTemplates_Integration(t *testing.T) {
 
 func TestStreamBufferWithChunkMerger_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	// Create a stream buffer with sentence flushing
@@ -148,7 +148,7 @@ func TestStreamBufferWithChunkMerger_Integration(t *testing.T) {
 
 func TestSchemaValidation_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	// Build a complex schema
@@ -175,7 +175,7 @@ func TestSchemaValidation_Integration(t *testing.T) {
 
 func TestJSONConstrainer_Integration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	constrainer := outlines.NewJSONConstrainer()
