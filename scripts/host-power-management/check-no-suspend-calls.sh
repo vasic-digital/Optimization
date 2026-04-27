@@ -31,6 +31,8 @@ EXCLUDE_DIRS=(
   ".cache" ".gradle" ".idea" ".vscode" ".venv" "venv" "__pycache__"
   "build" "dist" "target" "out" "bin" "obj"
   "releases"
+  "Example_Projects"
+  "submodules"
 )
 
 # File-path substrings allowlisted (the canonical artifacts and
