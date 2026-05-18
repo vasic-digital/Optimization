@@ -20,22 +20,45 @@ type Template struct {
 
 // Render renders the template with the given variables.
 // Variables are substituted using {{key}} placeholders.
+//
+// Security: unresolved-variable detection scans the ORIGINAL template
+// content (not the post-substitution result), so user-supplied variable
+// values containing {{...}} sequences are treated as literal text and
+// cannot be mistaken for additional template placeholders. This prevents
+// CONST-035 injection bluffs (security test TestTemplate_InjectionResistance).
 func (t *Template) Render(vars map[string]string) (string, error) {
-	result := t.Content
-	for key, value := range vars {
-		placeholder := "{{" + key + "}}"
-		result = strings.ReplaceAll(result, placeholder, value)
-	}
-
-	// Check for unresolved placeholders.
-	if idx := strings.Index(result, "{{"); idx != -1 {
-		end := strings.Index(result[idx:], "}}")
-		if end != -1 {
-			varName := result[idx+2 : idx+end]
+	// Step 1: detect unresolved placeholders in the ORIGINAL content
+	// before any substitution. A placeholder is "unresolved" iff its
+	// variable name has no entry in the supplied vars map.
+	content := t.Content
+	cursor := 0
+	for {
+		idx := strings.Index(content[cursor:], "{{")
+		if idx == -1 {
+			break
+		}
+		absIdx := cursor + idx
+		end := strings.Index(content[absIdx:], "}}")
+		if end == -1 {
+			break // dangling "{{" with no closing — leave it as literal
+		}
+		varName := content[absIdx+2 : absIdx+end]
+		if _, ok := vars[varName]; !ok {
 			return "", fmt.Errorf(
 				"unresolved variable: %s", varName,
 			)
 		}
+		cursor = absIdx + end + 2
+	}
+
+	// Step 2: substitute every supplied variable. Values containing
+	// {{...}} sequences are inert because step 1 already validated
+	// the original content; the post-substitution string is never
+	// re-scanned for placeholders.
+	result := content
+	for key, value := range vars {
+		placeholder := "{{" + key + "}}"
+		result = strings.ReplaceAll(result, placeholder, value)
 	}
 
 	return result, nil

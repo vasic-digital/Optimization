@@ -186,11 +186,16 @@ func TestTokenCounting_E2E(t *testing.T) {
 
 	counter := streaming.NewTokenCounter()
 
+	// CONST-035 anti-bluff: every value is the EXACT word count, not an
+	// inflated estimate. Prior revision asserted 5 for "The quick brown
+	// fox" with a comment about "~4 words * 1.3 rounded" — that arithmetic
+	// belongs to the token count, not the word count. The post-assertion
+	// `tokenCount >= wordCount` covers the inflation invariant honestly.
 	texts := map[string]int{
 		"":                    0,
 		"hello":               1,
 		"hello world":         2,
-		"The quick brown fox": 5, // ~4 words * 1.3 rounded
+		"The quick brown fox": 4, // strings.Fields → 4 whitespace-separated tokens
 	}
 
 	for text, expectedWords := range texts {
