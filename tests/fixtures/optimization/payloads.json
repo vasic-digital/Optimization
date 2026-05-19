@@ -1,0 +1,87 @@
+{
+  "_comment": "Round-259 multi-locale fixtures for digital.vasic.optimization. Used by challenges/scripts/optimization_describe_challenge.sh and challenges/runner/main.go to verify UTF-8 / non-ASCII text round-trips losslessly through gptcache.InMemoryCache (Set/Get + semantic match), prompt.Template.Render (rune-safe {{Name}} substitution), prompt.Compressor.Optimize (whitespace + filler-phrase + truncation), streaming.StreamBuffer (FlushOnSentence + FlushOnWord), streaming.TokenCounter / ChunkMerger, and outlines.SchemaBuilder / JSONConstrainer (rune-aware extraction + min/max length). CONST-046 alignment: no hardcoded English-only assumption.",
+  "inputs": [
+    {
+      "locale": "en",
+      "query": "What is the capital of France?",
+      "response": "The capital of France is Paris.",
+      "template": "Greetings, {{Name}}! Welcome.",
+      "template_var": "Alice",
+      "expected_rendered": "Greetings, Alice! Welcome.",
+      "filler_prompt": "Please note that the answer is essentially 42, in other words 42.",
+      "filler_min_compression": 5,
+      "sentence_stream": "First sentence. Second sentence! Third? Fourth.",
+      "sentence_min_flushed": 3,
+      "json_payload": "{\"name\":\"Alice\",\"age\":30}",
+      "expected_min_runes": 25
+    },
+    {
+      "locale": "sr",
+      "query": "Која је престоница Србије?",
+      "response": "Престоница Србије је Београд.",
+      "template": "Здраво, {{Name}}! Добродошли.",
+      "template_var": "Милица",
+      "expected_rendered": "Здраво, Милица! Добродошли.",
+      "filler_prompt": "Please note that одговор је суштински 42, in other words 42.",
+      "filler_min_compression": 5,
+      "sentence_stream": "Прва реченица. Друга реченица! Трећа? Четврта.",
+      "sentence_min_flushed": 3,
+      "json_payload": "{\"name\":\"Милица\",\"age\":28}",
+      "expected_min_runes": 25
+    },
+    {
+      "locale": "ja",
+      "query": "日本の首都はどこですか?",
+      "response": "日本の首都は東京です。",
+      "template": "こんにちは、{{Name}}さん!ようこそ。",
+      "template_var": "アリス",
+      "expected_rendered": "こんにちは、アリスさん!ようこそ。",
+      "filler_prompt": "Please note that 答えは essentially 42 です, in other words 42.",
+      "filler_min_compression": 5,
+      "sentence_stream": "First. Second! Third? Fourth.",
+      "sentence_min_flushed": 3,
+      "json_payload": "{\"name\":\"アリス\",\"age\":25}",
+      "expected_min_runes": 10
+    },
+    {
+      "locale": "ar",
+      "query": "ما هي عاصمة مصر؟",
+      "response": "عاصمة مصر هي القاهرة.",
+      "template": "مرحبا، {{Name}}! أهلا بك.",
+      "template_var": "أليس",
+      "expected_rendered": "مرحبا، أليس! أهلا بك.",
+      "filler_prompt": "Please note that الجواب essentially 42, in other words 42.",
+      "filler_min_compression": 5,
+      "sentence_stream": "First. Second! Third? Fourth.",
+      "sentence_min_flushed": 3,
+      "json_payload": "{\"name\":\"أليس\",\"age\":27}",
+      "expected_min_runes": 15
+    },
+    {
+      "locale": "zh-CN",
+      "query": "中国的首都是哪里?",
+      "response": "中国的首都是北京。",
+      "template": "你好, {{Name}}!欢迎。",
+      "template_var": "爱丽丝",
+      "expected_rendered": "你好, 爱丽丝!欢迎。",
+      "filler_prompt": "Please note that 答案 essentially 是 42, in other words 42.",
+      "filler_min_compression": 5,
+      "sentence_stream": "First. Second! Third? Fourth.",
+      "sentence_min_flushed": 3,
+      "json_payload": "{\"name\":\"爱丽丝\",\"age\":29}",
+      "expected_min_runes": 8
+    }
+  ],
+  "expected_invariants": {
+    "cache_exact_hit_returns_byte_exact_response": true,
+    "cache_semantic_hit_above_threshold": true,
+    "cache_miss_returns_err_cache_miss": true,
+    "template_render_is_rune_safe": true,
+    "template_render_rejects_unresolved_variable": true,
+    "compressor_removes_redundant_phrases": true,
+    "stream_buffer_flushes_on_sentence_boundary": true,
+    "chunk_merger_emits_after_min_chunk_size": true,
+    "json_constrainer_validates_against_schema": true,
+    "regex_constrainer_extracts_matched_substring": true
+  }
+}

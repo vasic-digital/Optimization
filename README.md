@@ -4,6 +4,58 @@ Generic, reusable LLM optimization module for Go applications. Provides semantic
 
 **Module**: `digital.vasic.optimization` (Go 1.24+)
 
+## Anti-bluff guarantees (round-259)
+
+> Verbatim 2026-05-19 operator mandate: *"all existing tests and Challenges do work in anti-bluff manner - they MUST confirm that all tested codebase really works as expected! We had been in position that all tests do execute with success and all Challenges as well, but in reality the most of the features does not work and can't be used! This MUST NOT be the case and execution of tests and Challenges MUST guarantee the quality, the completition and full usability by end users of the product!"*
+
+Every PASS reported by the round-259 challenge runner
+(`challenges/runner/main.go`) carries positive runtime evidence — the
+locale code, the package exercised, and a numerical proof (rune count,
+similarity score, byte-reduction delta, flushed-sentence count, merged
+chunk text, JSON extract). No metadata-only PASS is emitted from any
+section.
+
+- **Multi-locale cache round-trip.** Section 1 stores 5 locale-distinct
+  query/response pairs through `gptcache.InMemoryCache.Set` and asserts
+  `Get` returns byte-exact bytes with `Similarity == 1.0` for English,
+  Cyrillic (sr), Japanese (ja), Arabic (ar), and Han (zh-CN). PASS
+  lines carry `utf8.RuneCountInString` so byte preservation is
+  observable, not assumed. Invalidate-then-Get verifies
+  `ErrCacheMiss`; empty-query verifies `ErrInvalidQuery`.
+- **Semantic match.** Section 2 wires an `EmbeddingMatcher` with a
+  deterministic sha256-derived embedder (no external service) and
+  exercises `CosineSimilarity`, `NormalizeL2`, `DefaultConfig`,
+  `Validate`, and `Clear`.
+- **Rune-safe template substitution + injection safety.** Section 3
+  asserts every locale's `{{Name}}` placeholder renders byte-exact;
+  unresolved variables are rejected; values containing `{{Other}}`
+  are preserved verbatim (never re-scanned, security-tested).
+- **Real compression path.** Section 4 asserts a per-locale minimum
+  byte reduction from `Compressor.Optimize` (filler-phrase removal +
+  whitespace normalization), plus token-budget truncation.
+- **Real streaming flush logic.** Section 5 exercises `FlushOnSentence`,
+  `FlushOnWord`, `FlushOnLine`, `FlushOnSize`, plus `Flush` / `Reset`
+  semantics. Section 6 covers `TokenCounter` (default + custom ratio +
+  rune-aware `CountCharacters` on Cyrillic) and `ChunkMerger`
+  (below-threshold hold, threshold-cross emission, `Flush`, `Reset`).
+- **Real JSON-schema validation.** Section 7 builds a
+  `{name:string,age:integer}` object schema via `SchemaBuilder`, feeds
+  every locale's JSON payload through `JSONConstrainer`, exercises
+  prose-embedded JSON extraction, missing-required-field rejection,
+  enum validation, array `MinItems`, `ParseSchema`, `IsRequired`,
+  `RegexConstrainer` (extract + reject + bad-pattern), and the
+  helpers.
+- **Paired mutation.** Running
+  `challenges/scripts/optimization_describe_challenge.sh
+  --anti-bluff-mutate` plants a deliberate
+  `InMemoryCache -> InMemoryBogus_MUTATED` rename in a tmp copy of
+  the ledger and asserts the gate exits 99 — proving the
+  symbol-to-test ledger actually catches drift instead of
+  rubber-stamping it.
+
+Symbol-to-test ledger: `docs/test-coverage.md`.
+Quick start: `bash challenges/scripts/optimization_describe_challenge.sh`.
+
 ## Architecture
 
 The module is organized into six independent packages, each addressing a specific LLM optimization concern. The gptcache package reduces redundant API calls through semantic similarity matching. The prompt package compresses and templates prompts. The streaming package optimizes real-time token delivery. The outlines package constrains and validates structured output. The sglang package integrates with SGLang serving. The adapter package bridges LlamaIndex and LangChain frameworks.

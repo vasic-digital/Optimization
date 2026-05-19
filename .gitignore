@@ -1,34 +1,66 @@
-# Binaries
+# CONST-053: build artefacts
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+*.a
+*.o
+*.class
+*.pyc
+/bin/
+/build/
+/dist/
+/out/
+target/
 
-# Test binary
+# CONST-053: test artefacts
 *.test
 
-# Output
+# CONST-053: coverage / logs
 *.out
-
-# Coverage
+*.log
 coverage.html
 coverage.out
+htmlcov/
 
-# IDE
-.idea/
-.vscode/
+# CONST-053: cache files
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+.cache/
+.gradle/
+.terraform/
+
+# CONST-053: temp files
+*.tmp
 *.swp
 *.swo
 *~
+*.orig
+*.rej
 
-# OS
+# CONST-053: sensitive-data files (allow .env.example placeholder only)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+id_rsa*
+id_ed25519*
+.netrc
+secrets/
+api_keys.sh
+
+# CONST-053: OS / IDE personal state
+.idea/
+.vscode/
+.history/
 .DS_Store
 Thumbs.db
-
-# Build
-/bin/
-/dist/
 
 # Vendor (use modules)
 /vendor/
